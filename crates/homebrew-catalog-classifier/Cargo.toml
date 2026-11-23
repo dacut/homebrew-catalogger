@@ -2,6 +2,7 @@
 name = "homebrew-catalog-classifier"
 description = "Classify Homebrew formulae using an LLM"
 keywords = ["Homebrew"]
+readme = "README.md"
 
 authors.workspace = true
 edition.workspace = true

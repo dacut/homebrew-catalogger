@@ -2,6 +2,7 @@
 name = "homebrew-catalog-classifier-cli"
 description = "Command line interface to homebrew-catalog-classifier"
 keywords = ["Homebrew"]
+readme = "README.md"
 
 authors.workspace = true
 edition.workspace = true

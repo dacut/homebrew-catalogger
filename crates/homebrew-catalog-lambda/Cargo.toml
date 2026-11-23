@@ -2,6 +2,7 @@
 name = "homebrew-catalog-lambda"
 description = "AWS Lambda function that keeps the Homebrew formula catalog website up to date"
 keywords = ["Homebrew"]
+readme = "README.md"
 publish = false
 
 authors.workspace = true
