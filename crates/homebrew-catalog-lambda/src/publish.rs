@@ -128,7 +128,8 @@ pub async fn upload_site(s3: &aws_sdk_s3::Client, bucket: &str, files: &[SiteFil
     Ok(())
 }
 
-/// The keys to delete after publishing: pages that the new site no longer has. Stylesheets and the catalog are kept.
+/// The keys to delete after publishing: pages that the new site no longer has. Stylesheets, the catalog, and the
+/// publishing lock are kept.
 pub fn stale_keys(
     existing: impl IntoIterator<Item = String>,
     published: &HashSet<&str>,
@@ -136,7 +137,12 @@ pub fn stale_keys(
 ) -> Vec<String> {
     existing
         .into_iter()
-        .filter(|key| !key.starts_with(ASSETS_PREFIX) && key != catalog_key && !published.contains(key.as_str()))
+        .filter(|key| {
+            !key.starts_with(ASSETS_PREFIX)
+                && key != catalog_key
+                && key != crate::lock::LOCK_KEY
+                && !published.contains(key.as_str())
+        })
         .collect()
 }
 
@@ -267,9 +273,15 @@ mod tests {
 
     #[test]
     fn finds_stale_pages() {
-        let existing =
-            ["index.html", "categories/gone.html", "categories/games.html", "assets/old.css", "catalog.json"]
-                .map(String::from);
+        let existing = [
+            "index.html",
+            "categories/gone.html",
+            "categories/games.html",
+            "assets/old.css",
+            "catalog.json",
+            ".publish.lock",
+        ]
+        .map(String::from);
         let published = HashSet::from(["index.html", "categories/games.html"]);
         assert_eq!(stale_keys(existing, &published, "catalog.json"), ["categories/gone.html"]);
     }

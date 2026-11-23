@@ -116,8 +116,9 @@ scripts/publish.sh                # uploads your catalog, so the first run only 
 cd terraform && terraform apply
 ```
 
-Once it's running, the bucket's catalog (at `/formula-catalogged.json` on the site) is the current one. Download it
-before publishing manually, or `publish.sh` will overwrite what the function has classified since. See the
+Once it's running, the bucket's catalog (at `/formula-catalogged.json` on the site) is the current one. Manual
+publishing and the function share a lock, so they never write at the same time, and `publish.sh` refuses to replace a
+bucket catalog that's newer than yours (it tells you how to download it; `--force` overrides). See the
 [Lambda's README](crates/homebrew-catalog-lambda/README.md) for details.
 
 ## Development

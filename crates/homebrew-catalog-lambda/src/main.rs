@@ -11,6 +11,7 @@
 //! The invocation event is ignored. Settings come from environment variables; see [`config::Config`].
 
 mod config;
+mod lock;
 mod publish;
 mod update;
 
@@ -50,6 +51,20 @@ struct State {
 }
 
 /// The invocation's result.
+/// How long the update holds the publishing lock: longer than the function's 15-minute timeout, so a lock outlives
+/// any run that holds it, but not by much, so one left by a crash soon expires.
+const LOCK_TTL: std::time::Duration = std::time::Duration::from_secs(20 * 60);
+
+/// The invocation's result: what was published, or why nothing was.
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+enum Outcome {
+    Published(Summary),
+    Skipped {
+        skipped: String,
+    },
+}
+
 #[derive(Debug, Serialize)]
 struct Summary {
     #[serde(flatten)]
@@ -86,9 +101,31 @@ async fn main() -> Result<(), lambda_runtime::Error> {
 
     lambda_runtime::run(service_fn(move |event: LambdaEvent<Value>| {
         let state = Arc::clone(&state);
-        async move { handle(&state, &event.context).await.map_err(|e| format!("{e:#}")) }
+        async move { handle_locked(&state, &event.context).await.map_err(|e| format!("{e:#}")) }
     }))
     .await
+}
+
+/// Runs the update while holding the publishing lock shared with `scripts/publish.sh`. If manual publishing holds it,
+/// this run is skipped (the next scheduled run catches up) rather than reported as a failure.
+async fn handle_locked(state: &State, context: &Context) -> Result<Outcome> {
+    let holder = format!("update function, request {}", context.request_id);
+    let lock = match lock::acquire(&state.s3, &state.config.bucket, &holder, LOCK_TTL).await? {
+        lock::Acquire::Acquired(lock) => lock,
+        lock::Acquire::Held(held) => {
+            warn!(holder = %held.holder, expires = held.expires, "the site is being published by someone else; skipping");
+            return Ok(Outcome::Skipped {
+                skipped: format!("the site is being published by {}", held.holder),
+            });
+        }
+    };
+
+    let result = handle(state, context).await;
+    // A lock that can't be released expires on its own, so this doesn't fail the run.
+    if let Err(e) = lock::release(&state.s3, &state.config.bucket, &lock).await {
+        warn!(error = %format!("{e:#}"), "couldn't release the publishing lock; it will expire");
+    }
+    result.map(Outcome::Published)
 }
 
 async fn handle(state: &State, context: &Context) -> Result<Summary> {

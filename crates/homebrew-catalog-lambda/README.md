@@ -15,7 +15,8 @@ schedule when `enable_automation = true`.
    stylesheets are kept, since cached pages may still use them.
 6. Invalidates the CloudFront cache.
 
-The invocation event is ignored. A run returns a JSON summary:
+The invocation event is ignored. A run returns a JSON summary (or `{"skipped": "..."}` if manual publishing was in
+progress):
 
 ```json
 {
@@ -40,6 +41,11 @@ The invocation event is ignored. A run returns a JSON summary:
 - **One run at a time.** Each run rewrites the catalog and the site, so Terraform reserves a concurrency of 1: an
   invocation that arrives during a run waits until it finishes. If your account's concurrency limit is too low to
   reserve any, set `automation_prevent_overlapping_runs = false` and keep runs well apart.
+- **Manual publishing.** The function and [`scripts/publish.sh`](../../scripts/publish.sh) share a lock: an object,
+  `.publish.lock`, in the site bucket, created with a conditional write so only one holder can have it. A run that
+  finds `publish.sh` holding it is skipped (the next scheduled run catches up). Locks expire (20 minutes for the
+  function, 30 for `publish.sh`), so one left by a crash is taken over rather than blocking updates. Once it holds the
+  lock, `publish.sh` also refuses to replace a bucket catalog that's newer than the one being published.
 
 ## Configuration
 
