@@ -48,8 +48,9 @@ pub const DEFAULT_TITLE: &str = "Homebrew Formula Catalog";
 /// Cache-Control for files whose names include a hash of their contents (the stylesheet).
 pub const IMMUTABLE_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 
-/// Cache-Control for pages and other files that keep their names when their contents change.
-pub const PAGE_CACHE_CONTROL: &str = "public, max-age=300";
+/// Cache-Control for pages and other files that keep their names when their contents change: 4 hours. Publishing
+/// invalidates CloudFront's copies, but browsers may show a page up to this old.
+pub const PAGE_CACHE_CONTROL: &str = "public, max-age=14400";
 
 /// The site icon, and bitmap renderings of it for browsers without SVG icon support and for iOS home screens.
 /// Regenerate the bitmaps with `scripts/render-icons.sh` after changing the SVG.

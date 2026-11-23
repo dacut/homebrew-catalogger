@@ -12,7 +12,7 @@
 #      pages cached elsewhere may still reference them.
 #   4. Uploads the catalog (the input file) to the bucket root as formula-catalogged.json, where the update function
 #      reads it.
-#   5. Uploads pages, cached for 5 minutes, deleting pages that no longer exist.
+#   5. Uploads pages, cached for 4 hours, deleting pages that no longer exist.
 #   6. Invalidates the CloudFront cache, and releases the lock.
 #
 # AWS credentials come from the usual AWS CLI configuration (AWS_PROFILE, environment variables, SSO, ...).
@@ -24,6 +24,10 @@ set -euo pipefail
 readonly LOCK_KEY=.publish.lock
 readonly LOCK_TTL_SECONDS=1800
 readonly CATALOG_KEY=formula-catalogged.json
+
+# Cache lifetimes: a year for content-hashed stylesheets, 4 hours for everything else (pages and the catalog).
+readonly ASSET_CACHE_CONTROL="public, max-age=31536000, immutable"
+readonly PAGE_CACHE_CONTROL="public, max-age=14400"
 
 usage() {
     cat <<'EOF'
@@ -228,19 +232,19 @@ and publish again, or pass --force to replace it anyway."
 
     echo "==> Uploading stylesheets"
     aws s3 sync "$site_dir/assets" "s3://$bucket/assets/" \
-        --cache-control "public, max-age=31536000, immutable" "${sync_options[@]}"
+        --cache-control "$ASSET_CACHE_CONTROL" "${sync_options[@]}"
 
     echo "==> Uploading the catalog"
     if $dry_run; then
         echo "(dryrun) upload: $input to s3://$bucket/$CATALOG_KEY"
     else
         aws s3 cp "$input" "s3://$bucket/$CATALOG_KEY" --no-progress \
-            --content-type application/json --cache-control "public, max-age=300"
+            --content-type application/json --cache-control "$PAGE_CACHE_CONTROL"
     fi
 
     echo "==> Uploading pages"
     aws s3 sync "$site_dir" "s3://$bucket/" --delete --exclude "assets/*" --exclude "$CATALOG_KEY" \
-        --exclude "$LOCK_KEY" --cache-control "public, max-age=300" "${sync_options[@]}"
+        --exclude "$LOCK_KEY" --cache-control "$PAGE_CACHE_CONTROL" "${sync_options[@]}"
 
     if $dry_run; then
         echo "==> Dry run: would invalidate the CloudFront cache for /*"
