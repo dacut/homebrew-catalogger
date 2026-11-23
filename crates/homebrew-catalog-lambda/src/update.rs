@@ -67,11 +67,18 @@ pub async fn update_catalog(
     let mut outcomes: Vec<Option<Result<Vec<String>, String>>> = reused.into_iter().map(|r| r.map(Ok)).collect();
     if !to_classify.is_empty() {
         classifier.connect().await?;
-        let mut results =
-            classifier.classify_stream(to_classify.iter().map(|&i| refs[i])).zip(stream::iter(&to_classify));
+        // Results are taken in completion order (each tagged with its formula's index), so a slow or retrying request
+        // doesn't hold finished ones back: when the deadline hits, everything already classified is kept.
+        let mut results = stream::iter(&to_classify)
+            .map(|&i| {
+                let formula = refs[i];
+                async move { (i, classifier.classify(formula).await) }
+            })
+            .buffer_unordered(classifier.concurrency());
         loop {
             match tokio::time::timeout_at(deadline, results.next()).await {
-                Ok(Some(((name, result), &i))) => {
+                Ok(Some((i, result))) => {
+                    let name = &refs[i].name;
                     outcomes[i] = Some(match result {
                         Ok(classification) => {
                             stats.classified += 1;
@@ -138,6 +145,83 @@ mod tests {
             }
         );
         assert_eq!(annotated[0][CATEGORIES_FIELD], json!(["data-processing"]));
+    }
+
+    /// Serves Messages API requests on a local port: requests mentioning `slow_formula` stall, the rest answer at once.
+    async fn mock_api(slow_formula: &'static str) -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                tokio::spawn(async move {
+                    let mut data = Vec::new();
+                    let mut buf = [0u8; 8192];
+                    loop {
+                        let n = socket.read(&mut buf).await.unwrap_or(0);
+                        if n == 0 {
+                            return;
+                        }
+                        data.extend_from_slice(&buf[..n]);
+                        let Some(end) = data.windows(4).position(|w| w == b"\r\n\r\n") else {
+                            continue;
+                        };
+                        let head = String::from_utf8_lossy(&data[..end]).to_lowercase();
+                        let length: usize = head
+                            .lines()
+                            .find_map(|l| l.strip_prefix("content-length:"))
+                            .map_or(0, |v| v.trim().parse().unwrap());
+                        if data.len() >= end + 4 + length {
+                            break;
+                        }
+                    }
+                    if String::from_utf8_lossy(&data).contains(slow_formula) {
+                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                    }
+                    let body = json!({
+                        "model": "claude-haiku-5-5",
+                        "stop_reason": "end_turn",
+                        "content": [{"type": "text", "text": "{\"categories\": [\"games\"]}"}],
+                    })
+                    .to_string();
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                    let _ = socket.write_all(response.as_bytes()).await;
+                });
+            }
+        });
+        url
+    }
+
+    #[tokio::test]
+    async fn keeps_finished_results_when_an_earlier_request_is_slow() {
+        let url = mock_api("stalls-forever").await;
+        let classifier = Classifier::builder().api_key("test").base_url(&url).max_retries(0).build().unwrap();
+        let formula = |name: &str| HomebrewFormulaMeta {
+            name: name.into(),
+            full_name: name.into(),
+            ..Default::default()
+        };
+        // The slow formula comes first: results in input order would hold the quick one back until the deadline.
+        let formulae = [formula("stalls-forever"), formula("quick")];
+
+        let deadline = Instant::now() + std::time::Duration::from_secs(2);
+        let (annotated, stats) = update_catalog(&classifier, &formulae, None, deadline).await.unwrap();
+        assert_eq!(
+            stats,
+            UpdateStats {
+                formulae: 2,
+                classified: 1,
+                pending: 1,
+                ..UpdateStats::default()
+            }
+        );
+        assert_eq!(annotated[0][catalog::ERROR_FIELD], PENDING_MESSAGE, "input order is preserved");
+        assert_eq!(annotated[1][CATEGORIES_FIELD], json!(["games"]), "the finished classification is kept");
     }
 
     #[tokio::test]

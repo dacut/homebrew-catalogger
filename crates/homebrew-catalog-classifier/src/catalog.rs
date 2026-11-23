@@ -24,6 +24,7 @@ pub const ERROR_FIELD: &str = "classification_error";
 #[derive(Debug, Default)]
 pub struct PreviousCategories {
     by_name: HashMap<String, Vec<String>>,
+    catalog_size: usize,
 }
 
 impl PreviousCategories {
@@ -50,7 +51,13 @@ impl PreviousCategories {
             .collect();
         Self {
             by_name,
+            catalog_size: formulae.len(),
         }
+    }
+
+    /// The number of formulae in the previous catalog, whether or not they were classified.
+    pub fn catalog_size(&self) -> usize {
+        self.catalog_size
     }
 
     /// The number of formulae with recorded categories.
@@ -169,6 +176,7 @@ mod tests {
     fn loads_only_successful_classifications() {
         let prev = previous();
         assert_eq!(prev.len(), 3);
+        assert_eq!(prev.catalog_size(), 6, "the catalog size counts unclassified formulae too");
         let mut names: Vec<_> = prev.by_name.into_keys().collect();
         names.sort();
         assert_eq!(names, ["jq", "old-name", "stale"]);

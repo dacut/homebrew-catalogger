@@ -37,6 +37,9 @@ The invocation event is ignored. A run returns a JSON summary:
   is reported as failed, so it shows up in Lambda's error metrics.
 - **No immediate retries.** Terraform turns off Lambda's automatic retries; the next scheduled run picks up where the
   last left off.
+- **One run at a time.** Each run rewrites the catalog and the site, so Terraform reserves a concurrency of 1: an
+  invocation that arrives during a run waits until it finishes. If your account's concurrency limit is too low to
+  reserve any, set `automation_prevent_overlapping_runs = false` and keep runs well apart.
 
 ## Configuration
 

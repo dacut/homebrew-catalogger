@@ -145,11 +145,13 @@ pub fn write_site(site: &Site, options: &SiteOptions, out: &Path) -> Result<usiz
     let categories_index = render::index_page(&nested, site, "", generated).into_string();
     write(out.join("categories").join("index.html"), categories_index.as_bytes())?;
 
-    // Served for any missing URL, so it links to its resources from the site root.
+    // Served for any missing URL, so it links to the site root by absolute URL: the base URL if there is one (which
+    // keeps a site under a path prefix working), otherwise the host's root.
+    let site_root = base_url.map_or("/", BaseUrl::as_str);
     let not_found = Page {
         site_title: title,
-        root: "/",
-        home_href: "/",
+        root: site_root,
+        home_href: site_root,
         styles: Styles::Inline,
         base_url,
     };
@@ -202,6 +204,9 @@ mod tests {
         let sitemap = fs::read_to_string(dir.path().join("sitemap.xml")).unwrap();
         assert!(sitemap.contains("<loc>https://brew.example.com/categories/data-processing.html</loc>"));
         assert!(!sitemap.contains("categories/index.html") && !sitemap.contains("404"));
+        let not_found = fs::read_to_string(dir.path().join("404.html")).unwrap();
+        assert!(not_found.contains(r#"<a href="https://brew.example.com/">Browse all categories</a>"#));
+        assert!(not_found.contains(r#"<link rel="icon" href="https://brew.example.com/favicon.svg""#));
         let llms = fs::read_to_string(dir.path().join("llms.txt")).unwrap();
         assert!(llms.contains("(https://brew.example.com/categories/data-processing.html)"));
 
@@ -239,6 +244,8 @@ mod tests {
         assert!(!dir.path().join("sitemap.xml").exists());
         assert_eq!(fs::read_to_string(dir.path().join("robots.txt")).unwrap(), "User-agent: *\nAllow: /\n");
         assert!(!fs::read_to_string(dir.path().join("index.html")).unwrap().contains("canonical"));
+        let not_found = fs::read_to_string(dir.path().join("404.html")).unwrap();
+        assert!(not_found.contains(r#"<a href="/">Browse all categories</a>"#), "without a base URL, the host root");
     }
 
     #[test]

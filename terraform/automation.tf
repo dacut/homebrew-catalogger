@@ -10,7 +10,8 @@ locals {
   lambda_package = coalesce(var.lambda_package, "${path.module}/../target/lambda/homebrew-catalog-lambda/bootstrap.zip")
 
   # The model name without any inference profile or provider prefix, e.g. "claude-haiku-5-5", for IAM resources.
-  bedrock_model_name = regex("claude-[a-z0-9.-]+$", var.bedrock_model)
+  # A version suffix (as in "claude-haiku-4-5-20251001-v1:0") is kept: it's part of the foundation model's ARN.
+  bedrock_model_name = regex("claude-[a-z0-9.:-]+$", var.bedrock_model)
 
   update_function_name = "${local.name_prefix}-update"
 }
@@ -106,6 +107,11 @@ resource "aws_lambda_function" "update" {
   # Parsing two copies of formula.json (about 32 MB each) needs room; more memory also means more CPU.
   memory_size = 2048
   timeout     = 900
+
+  # Each run reads, updates, and rewrites the catalog and site, so two runs at once could overwrite each other's
+  # work. With a reserved concurrency of 1, an overlapping invocation is throttled and Lambda retries it (for up to
+  # six hours) once the current run finishes. -1 removes the reservation.
+  reserved_concurrent_executions = var.automation_prevent_overlapping_runs ? 1 : -1
 
   ephemeral_storage {
     size = 1024

@@ -186,22 +186,6 @@ fn load_env_file(path: Option<&Path>) -> Result<()> {
 
 async fn run(cli: Cli) -> Result<ExitCode> {
     let taxonomy = load_taxonomy(&cli)?;
-    let mut builder = Classifier::builder()
-        .model(&cli.model)
-        .effort(Some(cli.effort.into()))
-        .max_categories(cli.max_categories.into())
-        .concurrency(cli.concurrency.into())
-        .taxonomy(taxonomy);
-    if cli.bedrock {
-        builder = builder.bedrock(Bedrock {
-            region: cli.aws_region.clone(),
-            profile: cli.aws_profile.clone(),
-            geography: cli.bedrock_geography.clone(),
-            ..Bedrock::default()
-        });
-    }
-    let classifier = builder.build()?;
-
     let all = load_formulae(&cli.input).with_context(|| format!("loading {}", cli.input.display()))?;
     let selected = select_formulae(&all, &cli.formulae, cli.limit)?;
     let previous = cli
@@ -213,7 +197,7 @@ async fn run(cli: Cli) -> Result<ExitCode> {
         .transpose()?;
     let forced = resolve_forced(&selected, &cli.reclassify)?;
     let (reused, to_classify) =
-        catalog::plan(&selected, previous.as_ref(), &forced, classifier.taxonomy(), cli.max_categories.into());
+        catalog::plan(&selected, previous.as_ref(), &forced, &taxonomy, cli.max_categories.into());
 
     // Fail before spending anything on API calls if the output can't be written.
     let output = cli.output.as_deref().map(PendingOutput::create).transpose()?;
@@ -226,30 +210,33 @@ async fn run(cli: Cli) -> Result<ExitCode> {
         );
     }
 
-    // Report a credential or region problem once, up front, rather than as a failure for every formula. Skipped when
-    // everything is reused, since no credentials are needed then.
-    if !to_classify.is_empty() {
-        classifier.connect().await?;
-    }
-
     // Each formula's outcome: reused categories, or (below) the model's categories or error.
     let mut outcomes: Vec<Option<Result<Vec<String>, String>>> = reused.into_iter().map(|r| r.map(Ok)).collect();
-    let mut progress = Progress::new(to_classify.len(), cli.quiet);
     let mut failed = 0;
-    // `classify_stream` yields results in input order, so each result lines up with its index.
-    let mut results =
-        classifier.classify_stream(to_classify.iter().map(|&i| selected[i])).zip(stream::iter(&to_classify));
-    while let Some(((name, result), &i)) = results.next().await {
-        debug_assert_eq!(name, selected[i].name);
-        outcomes[i] = Some(result.map(|c| c.categories).map_err(|e| {
-            failed += 1;
-            let error = error_chain(&e);
-            progress.error(&name, &error);
-            error
-        }));
-        progress.advance();
+
+    // Credentials are only needed when something has to be classified, so the classifier is built (and checked)
+    // only then: a run that reuses everything works without them.
+    if !to_classify.is_empty() {
+        let classifier = build_classifier(&cli, taxonomy)?;
+        // Report a credential or region problem once, up front, rather than as a failure for every formula.
+        classifier.connect().await?;
+
+        let mut progress = Progress::new(to_classify.len(), cli.quiet);
+        // `classify_stream` yields results in input order, so each result lines up with its index.
+        let mut results =
+            classifier.classify_stream(to_classify.iter().map(|&i| selected[i])).zip(stream::iter(&to_classify));
+        while let Some(((name, result), &i)) = results.next().await {
+            debug_assert_eq!(name, selected[i].name);
+            outcomes[i] = Some(result.map(|c| c.categories).map_err(|e| {
+                failed += 1;
+                let error = error_chain(&e);
+                progress.error(&name, &error);
+                error
+            }));
+            progress.advance();
+        }
+        progress.finish();
     }
-    progress.finish();
 
     let annotated = selected
         .iter()
@@ -274,6 +261,25 @@ async fn run(cli: Cli) -> Result<ExitCode> {
     } else {
         ExitCode::from(EXIT_PARTIAL)
     })
+}
+
+/// Builds the classifier from the command-line options. Fails if the chosen platform's credentials are missing.
+fn build_classifier(cli: &Cli, taxonomy: Taxonomy) -> Result<Classifier> {
+    let mut builder = Classifier::builder()
+        .model(&cli.model)
+        .effort(Some(cli.effort.into()))
+        .max_categories(cli.max_categories.into())
+        .concurrency(cli.concurrency.into())
+        .taxonomy(taxonomy);
+    if cli.bedrock {
+        builder = builder.bedrock(Bedrock {
+            region: cli.aws_region.clone(),
+            profile: cli.aws_profile.clone(),
+            geography: cli.bedrock_geography.clone(),
+            ..Bedrock::default()
+        });
+    }
+    Ok(builder.build()?)
 }
 
 fn load_taxonomy(cli: &Cli) -> Result<Taxonomy> {

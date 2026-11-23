@@ -117,6 +117,18 @@ fn rejects_unrecognized_and_invalid_files() {
     write(&file, &json!({"not": "a formula"}));
     assert!(matches!(read_formula_file(&file), Err(Error::UnrecognizedMetadata { .. })));
 
+    // Array entries get the same check as a standalone object.
+    for bad in [json!([{}]), json!([formula("ok", "fine"), {"not": "a formula"}]), json!([{"name": ""}]), json!([1])] {
+        write(&file, &bad);
+        match read_formula_file(&file) {
+            Err(Error::UnrecognizedMetadata {
+                reason,
+                ..
+            }) => assert!(reason.contains("entry"), "{reason}"),
+            other => panic!("{bad} should be rejected, got {other:?}"),
+        }
+    }
+
     fs::write(&file, "{").unwrap();
     assert!(matches!(read_formula_file(&file), Err(Error::Json { .. })));
 

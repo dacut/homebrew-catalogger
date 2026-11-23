@@ -79,12 +79,12 @@ variable "lambda_package" {
 }
 
 variable "bedrock_model" {
-  description = "The Claude model the update function classifies with: a plain name such as \"claude-haiku-5-5\" (invoked through the inference profile for the region's geography) or a full inference profile ID."
+  description = "The Claude model the update function classifies with: a plain name such as \"claude-haiku-5-5\" (invoked through the inference profile for the region's geography) or a full inference profile ID, including versioned ones such as \"us.anthropic.claude-haiku-4-5-20251001-v1:0\"."
   type        = string
   default     = "claude-haiku-5-5"
 
   validation {
-    condition     = can(regex("^([a-z-]+\\.)?(anthropic\\.)?claude-[a-z0-9.-]+$", var.bedrock_model))
+    condition     = can(regex("^([a-z-]+\\.)?(anthropic\\.)?claude-[a-z0-9.-]+(:[0-9]+)?$", var.bedrock_model))
     error_message = "bedrock_model must be a Claude model name (e.g. \"claude-haiku-5-5\") or an inference profile ID (e.g. \"us.anthropic.claude-haiku-5-5\")."
   }
 }
@@ -101,9 +101,15 @@ variable "classify_concurrency" {
   default     = 8
 
   validation {
-    condition     = var.classify_concurrency >= 1
-    error_message = "classify_concurrency must be at least 1."
+    condition     = var.classify_concurrency >= 1 && floor(var.classify_concurrency) == var.classify_concurrency
+    error_message = "classify_concurrency must be a whole number, at least 1."
   }
+}
+
+variable "automation_prevent_overlapping_runs" {
+  description = "Reserve a concurrency of 1 for the update function, so that runs never overlap (an overlapping invocation is held and retried by Lambda once the current run finishes). Set to false only if your account's concurrency limit is too low to reserve any; then keep automation_schedule well over 15 minutes apart and avoid manual invocations during a run."
+  type        = bool
+  default     = true
 }
 
 variable "automation_log_retention_days" {

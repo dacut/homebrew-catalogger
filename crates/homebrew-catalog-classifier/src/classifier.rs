@@ -365,6 +365,12 @@ impl Classifier {
         self.max_categories
     }
 
+    /// How many requests [`classify_all`](Self::classify_all) and [`classify_stream`](Self::classify_stream) run at
+    /// once.
+    pub fn concurrency(&self) -> usize {
+        self.concurrency
+    }
+
     #[cfg(feature = "bedrock")]
     async fn bedrock_connection<'a>(
         &self,

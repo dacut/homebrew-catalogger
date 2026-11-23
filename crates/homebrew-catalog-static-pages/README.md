@@ -63,7 +63,8 @@ Formulae without categories are listed on an "Uncategorized" page, so none are l
   value, and homepage links are only made for `http` and `https` URLs.
 - **Friendly to CDNs:** pages use flat `.html` file names and relative links, so the site works from an S3 REST
   origin, which doesn't map `dir/` to `dir/index.html`, and under any path prefix. The 404 page is the exception: it
-  can be served at any URL, so it inlines its stylesheet and links home with `/`.
+  can be served at any URL, so it inlines its stylesheet and links home (and to the icons) through the base URL, or
+  through `/` without one.
 
 ### Caching
 

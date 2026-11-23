@@ -159,14 +159,43 @@ pub async fn delete_stale_pages(
     for chunk in stale.chunks(1000) {
         let objects =
             chunk.iter().map(|key| ObjectIdentifier::builder().key(key).build()).collect::<Result<Vec<_>, _>>()?;
-        s3.delete_objects()
+        let output = s3
+            .delete_objects()
             .bucket(bucket)
             .delete(Delete::builder().set_objects(Some(objects)).quiet(true).build()?)
             .send()
             .await
             .with_context(|| format!("deleting stale pages from s3://{bucket}"))?;
+        // DeleteObjects succeeds as a whole even when individual keys fail; those are listed in `Errors`.
+        if let Some(failures) = deletion_failures(output.errors()) {
+            anyhow::bail!("couldn't delete stale pages from s3://{bucket}: {failures}");
+        }
     }
     Ok(stale.len())
+}
+
+/// Describes the per-key failures in a DeleteObjects response, if there were any.
+fn deletion_failures(errors: &[aws_sdk_s3::types::Error]) -> Option<String> {
+    const SHOWN: usize = 5;
+    if errors.is_empty() {
+        return None;
+    }
+    let mut described: Vec<String> = errors
+        .iter()
+        .take(SHOWN)
+        .map(|e| {
+            format!(
+                "{} ({}: {})",
+                e.key().unwrap_or("?"),
+                e.code().unwrap_or("unknown error"),
+                e.message().unwrap_or("no message")
+            )
+        })
+        .collect();
+    if errors.len() > SHOWN {
+        described.push(format!("and {} more", errors.len() - SHOWN));
+    }
+    Some(described.join(", "))
 }
 
 /// Invalidates every cached path, returning the invalidation's ID.
@@ -218,6 +247,22 @@ mod tests {
                 ("sitemap.xml", "application/xml", PAGE_CACHE_CONTROL),
             ]
         );
+    }
+
+    #[test]
+    fn reports_per_key_deletion_failures() {
+        assert_eq!(deletion_failures(&[]), None);
+
+        let error = |key: &str| {
+            aws_sdk_s3::types::Error::builder().key(key).code("AccessDenied").message("Access Denied").build()
+        };
+        assert_eq!(
+            deletion_failures(&[error("categories/gone.html")]).as_deref(),
+            Some("categories/gone.html (AccessDenied: Access Denied)")
+        );
+        let many: Vec<_> = (0..7).map(|i| error(&format!("p{i}.html"))).collect();
+        let text = deletion_failures(&many).unwrap();
+        assert!(text.contains("p4.html") && !text.contains("p5.html") && text.ends_with("and 2 more"), "{text}");
     }
 
     #[test]

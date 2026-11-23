@@ -220,6 +220,11 @@ run "automation_enabled" {
   }
 
   assert {
+    condition     = aws_lambda_function.update[0].reserved_concurrent_executions == 1
+    error_message = "Runs should not overlap: each one rewrites the catalog and site."
+  }
+
+  assert {
     condition     = aws_lambda_function_event_invoke_config.update[0].maximum_retry_attempts == 0
     error_message = "Failed runs should wait for the next schedule rather than retrying immediately."
   }
@@ -254,4 +259,45 @@ run "rejects_invalid_bedrock_model" {
   }
 
   expect_failures = [var.bedrock_model]
+}
+
+
+run "versioned_bedrock_model_ids" {
+  command = plan
+
+  variables {
+    enable_automation = true
+    lambda_package    = "functions/folder-index.js"
+    bedrock_model     = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+  }
+
+  assert {
+    condition     = local.bedrock_model_name == "claude-haiku-4-5-20251001-v1:0"
+    error_message = "The version suffix is part of the foundation model's name and must be kept for IAM."
+  }
+}
+
+run "overlap_protection_can_be_turned_off" {
+  command = plan
+
+  variables {
+    enable_automation                   = true
+    lambda_package                      = "functions/folder-index.js"
+    automation_prevent_overlapping_runs = false
+  }
+
+  assert {
+    condition     = aws_lambda_function.update[0].reserved_concurrent_executions == -1
+    error_message = "Without overlap protection, the function should have no reserved concurrency."
+  }
+}
+
+run "rejects_fractional_concurrency" {
+  command = plan
+
+  variables {
+    classify_concurrency = 1.5
+  }
+
+  expect_failures = [var.classify_concurrency]
 }

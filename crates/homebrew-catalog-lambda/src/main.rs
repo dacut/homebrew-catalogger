@@ -107,7 +107,7 @@ async fn handle(state: &State, context: &Context) -> Result<Summary> {
     let previous = match download_catalog(state, &work.join("previous.json")).await? {
         Some(path) => {
             let previous = PreviousCategories::load(&path).context("reading the current catalog")?;
-            info!(formulae = previous.len(), "loaded the current catalog");
+            info!(formulae = previous.catalog_size(), classified = previous.len(), "loaded the current catalog");
             Some(previous)
         }
         None => {
@@ -120,7 +120,9 @@ async fn handle(state: &State, context: &Context) -> Result<Summary> {
     let formula_path = work.join("formula.json");
     download_formulae(state, &formula_path).await?;
     let formulae = load_formulae(&formula_path).context("reading the downloaded formula.json")?;
-    update::check_formula_count(formulae.len(), previous.as_ref().map_or(0, PreviousCategories::len))?;
+    // Compare against every entry in the current catalog, not just the classified ones, so a catalog with many
+    // pending formulae doesn't weaken the guard.
+    update::check_formula_count(formulae.len(), previous.as_ref().map_or(0, PreviousCategories::catalog_size))?;
     info!(formulae = formulae.len(), "downloaded the latest formula metadata");
 
     // 3. Classify what's new.

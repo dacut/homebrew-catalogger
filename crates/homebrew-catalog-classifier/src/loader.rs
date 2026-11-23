@@ -135,11 +135,22 @@ pub fn read_formula_file(path: impl AsRef<Path>) -> Result<Vec<HomebrewFormulaMe
     }
 
     match value {
+        // Every entry must look like a formula: `HomebrewFormulaMeta` defaults every field, so without this check
+        // `[{}]` or an array of unrelated objects would load as formulae with empty names.
         Value::Array(items) => items
             .into_iter()
-            .map(|item| serde_json::from_value(item).map_err(|source| json_error(path, source)))
+            .enumerate()
+            .map(|(index, item)| {
+                if !is_formula(&item) {
+                    return Err(Error::UnrecognizedMetadata {
+                        path: path.to_path_buf(),
+                        reason: format!("entry {index} is not a formula object with a name"),
+                    });
+                }
+                serde_json::from_value(item).map_err(|source| json_error(path, source))
+            })
             .collect(),
-        Value::Object(ref obj) if obj.get("name").is_some_and(Value::is_string) => {
+        Value::Object(_) if is_formula(&value) => {
             Ok(vec![serde_json::from_value(value).map_err(|source| json_error(path, source))?])
         }
         _ => Err(Error::UnrecognizedMetadata {
@@ -147,6 +158,11 @@ pub fn read_formula_file(path: impl AsRef<Path>) -> Result<Vec<HomebrewFormulaMe
             reason: "expected a formula object, an array of formulae, or a JWS envelope".to_string(),
         }),
     }
+}
+
+/// Whether a JSON value is a formula: an object with a non-empty string `name`.
+fn is_formula(value: &Value) -> bool {
+    value.get("name").and_then(Value::as_str).is_some_and(|name| !name.trim().is_empty())
 }
 
 /// Accepts either the Homebrew cache root or its `api` subdirectory.
