@@ -1,0 +1,365 @@
+/*
+ * Styles for the Homebrew formula catalog.
+ *
+ * Colors follow the system light/dark preference with no JavaScript. Every text/background pair meets WCAG 2.2 AA
+ * contrast (4.5:1) in both modes, and most meet AAA (7:1). Sizes are in rem so they scale with the user's font size.
+ */
+
+:root {
+    color-scheme: light dark;
+
+    --bg: #ffffff;
+    --surface: #f6f8fa;
+    --border: #d0d7de;
+    --text: #1f2328;
+    --muted: #59636e;
+    /* Lower contrast than --muted for incidental text, but still 4.82:1 on --bg (AA needs 4.5:1). */
+    --subtle: #6a737d;
+    --link: #0550ae;
+    --focus: #0969da;
+
+    --badge-category-bg: #ddf4ff;
+    --badge-category-fg: #0a3069;
+    --badge-current-bg: #0550ae;
+    --badge-current-fg: #ffffff;
+    --badge-license-bg: #dafbe1;
+    --badge-license-fg: #116329;
+    --badge-deprecated-bg: #fff8c5;
+    --badge-deprecated-fg: #6c4400;
+    --badge-disabled-bg: #ffebe9;
+    --badge-disabled-fg: #82071e;
+
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --meta-size: 0.875rem;
+    --badge-size: 0.75rem;
+    --radius: 0.375rem;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #9198a1;
+        --subtle: #7a828c; /* 4.87:1 on --bg */
+        --link: #58a6ff;
+        --focus: #58a6ff;
+
+        --badge-category-bg: #0c2d6b;
+        --badge-category-fg: #cae8ff;
+        --badge-current-bg: #cae8ff;
+        --badge-current-fg: #0a3069;
+        --badge-license-bg: #033a16;
+        --badge-license-fg: #aff5b4;
+        --badge-deprecated-bg: #4b2900;
+        --badge-deprecated-fg: #f8e3a1;
+        --badge-disabled-bg: #67060c;
+        --badge-disabled-fg: #ffdcd7;
+    }
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+a {
+    color: var(--link);
+    text-underline-offset: 0.15em;
+}
+
+a:hover {
+    text-decoration-thickness: 2px;
+}
+
+:focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+main:focus {
+    outline: none;
+}
+
+.container {
+    width: 100%;
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+/* Hidden visually but still read by screen readers. */
+.visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+.skip-link {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    z-index: 100;
+    padding: 0.5rem 1rem;
+    background: var(--bg);
+    color: var(--link);
+    border: 2px solid var(--focus);
+    border-radius: var(--radius);
+    transform: translateY(-200%);
+}
+
+.skip-link:focus {
+    transform: none;
+}
+
+/* Header and footer */
+
+.site-header {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.site-header .container {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+.site-title {
+    color: var(--text);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.site-title:hover {
+    text-decoration: underline;
+}
+
+.site-footer {
+    margin-top: 3rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: var(--meta-size);
+}
+
+.site-footer .container {
+    padding-top: 1rem;
+    padding-bottom: 1.5rem;
+}
+
+.site-footer p {
+    margin: 0 0 0.5rem;
+}
+
+.site-footer p:last-child {
+    margin-bottom: 0;
+}
+
+.site-footer .generated {
+    color: var(--subtle);
+    font-size: var(--badge-size);
+    font-style: italic;
+}
+
+main.container {
+    padding-top: 1.5rem;
+}
+
+h1 {
+    margin: 0 0 0.5rem;
+    font-size: 1.75rem;
+    line-height: 1.25;
+}
+
+.page-intro {
+    margin: 0 0 1.5rem;
+    color: var(--muted);
+}
+
+/* Breadcrumbs */
+
+.breadcrumb {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 0 0 1rem;
+    padding: 0;
+    list-style: none;
+    font-size: var(--meta-size);
+    color: var(--muted);
+}
+
+.breadcrumb li + li::before {
+    content: "/";
+    padding-right: 0.25rem;
+    color: var(--muted);
+}
+
+/* Landing page: category grid */
+
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.category-card {
+    position: relative;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.category-card:hover {
+    border-color: var(--link);
+}
+
+.category-card h2 {
+    margin: 0 0 0.25rem;
+    font-size: 1rem;
+}
+
+/* Make the whole card clickable while keeping a single, well-named link. */
+.category-card h2 a::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+}
+
+.category-card p {
+    margin: 0;
+    color: var(--muted);
+    font-size: var(--meta-size);
+}
+
+.category-card .count {
+    margin-top: 0.5rem;
+}
+
+/* Category pages: formula list */
+
+.formula-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.formula {
+    padding: 0.875rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.formula:first-child {
+    border-top: 1px solid var(--border);
+}
+
+.formula h2 {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.formula-desc {
+    margin: 0.125rem 0 0;
+    font-size: var(--meta-size);
+}
+
+.formula-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+    font-size: var(--meta-size);
+}
+
+/* Flex rather than `display: contents`, which some browsers expose to screen readers without list semantics. */
+.badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.badge {
+    display: inline-block;
+    max-width: 100%;
+    padding: 0.125rem 0.5rem;
+    /* A transparent border becomes visible in forced-colors (high contrast) mode, where backgrounds are removed. */
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: var(--badge-size);
+    font-weight: 600;
+    line-height: 1.4;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+}
+
+a.badge:hover {
+    text-decoration: underline;
+}
+
+.badge-category {
+    background: var(--badge-category-bg);
+    color: var(--badge-category-fg);
+}
+
+.badge-category[aria-current="page"] {
+    background: var(--badge-current-bg);
+    color: var(--badge-current-fg);
+}
+
+.badge-license {
+    background: var(--badge-license-bg);
+    color: var(--badge-license-fg);
+    font-family: var(--font-mono);
+    font-weight: 500;
+}
+
+.badge-deprecated {
+    background: var(--badge-deprecated-bg);
+    color: var(--badge-deprecated-fg);
+}
+
+.badge-disabled {
+    background: var(--badge-disabled-bg);
+    color: var(--badge-disabled-fg);
+}
+
+@media (forced-colors: active) {
+    .badge,
+    .category-card {
+        border-color: CanvasText;
+    }
+}
