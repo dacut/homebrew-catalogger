@@ -1,0 +1,16 @@
+[workspace]
+members = [
+    "crates/homebrew-catalog-classifier",
+    "crates/homebrew-catalog-classifier-cli",
+    "crates/homebrew-catalog-lambda",
+    "crates/homebrew-catalog-static-pages",
+]
+resolver = "2"
+
+[workspace.package]
+authors = ["David Cuthbert <dacut@kanga.org>"]
+edition = "2024"
+homepage = "https://github.com/dacut/homebrew-catalogger"
+license = "MIT"
+repository = "https://github.com/dacut/homebrew-catalogger.git"
+version = "0.1.0"

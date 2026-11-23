@@ -1,0 +1,31 @@
+[package]
+name = "homebrew-catalog-lambda"
+description = "AWS Lambda function that keeps the Homebrew formula catalog website up to date"
+keywords = ["Homebrew"]
+readme = "README.md"
+publish = false
+
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow = "1"
+aws-config = { version = "1.13", features = ["behavior-version-latest"] }
+aws-sdk-cloudfront = "1.146"
+aws-sdk-s3 = "1.161"
+futures-util = "0.3"
+homebrew-catalog-classifier.path = "../homebrew-catalog-classifier"
+homebrew-catalog-static-pages.path = "../homebrew-catalog-static-pages"
+lambda_runtime = "1.5"
+reqwest = "0.13"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["fs", "macros", "rt-multi-thread", "time"] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["io-util", "net"] }

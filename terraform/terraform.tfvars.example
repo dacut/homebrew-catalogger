@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars and edit.
+
+domain_name      = "brew.example.com"
+hosted_zone_name = "example.com"
+
+# Optional:
+# bucket_name = "brew-example-com-site"
+# region      = "us-east-1"
+# price_class = "PriceClass_100"
+# tags = {
+#   Project = "homebrew-catalogger"
+# }
