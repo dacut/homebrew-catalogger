@@ -1,0 +1,17 @@
+/target
+.env
+
+# Terraform: local working directories, state (may contain sensitive values), and real variable files.
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars
+!*.tfvars.example
+
+# Generated site output.
+/site/
+
+# Formula data: formula.json comes from Homebrew, and the classified catalog lives in the site bucket (versioned).
+/formula.json
+/formula-catalogged.json
